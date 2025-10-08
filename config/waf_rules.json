@@ -1,0 +1,14 @@
+{
+  "sql_injection": [
+    "(?:')\\s*or\\s*1\\s*=\\s*1",
+    "(?:union)\\s+(?:select)",
+    "select\\s+.+\\s+from\\s+",
+    "information_schema",
+    "load_file\\s*\\(",
+    "benchmark\\s*\\(",
+    "sleep\\s*\\(",
+    "outfile",
+    "concat\\s*\\(",
+    "into\\s+outfile"
+  ]
+}

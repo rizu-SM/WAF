@@ -1,0 +1,98 @@
+PyWAF/
+├── README.md
+├── requirements.txt
+├── setup.py
+├── .env.example
+├── .gitignore
+│
+├── config/
+│   ├── __init__.py
+│   ├── waf_rules.json
+│   ├── waf_config.yaml
+│   └── whitelist.json
+│
+├── src/
+│   ├── __init__.py
+│   │
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── waf.py                  # Main WAF class orchestrating everything
+│   │   ├── proxy.py                # forward_request logic
+│   │   └── config_loader.py        # load_config, load_rules
+│   │
+│   ├── detection/
+│   │   ├── __init__.py
+│   │   ├── base.py                 # Base detector class
+│   │   ├── sql_injection.py        # detect_sql_injection
+│   │   ├── xss.py                  # detect_xss
+│   │   ├── path_traversal.py       # detect_traversal
+│   │   └── pattern_matcher.py      # match_patterns helper
+│   │
+│   ├── security/
+│   │   ├── __init__.py
+│   │   ├── rate_limiter.py         # rate_limit_check, increment_counter
+│   │   ├── bruteforce.py           # bruteforce_protect
+│   │   ├── ip_manager.py           # temp_block_ip, whitelist_temporary
+│   │   └── challenge.py            # serve_challenge
+│   │
+│   ├── rules/
+│   │   ├── __init__.py
+│   │   ├── engine.py               # evaluate_rules
+│   │   └── loader.py               # load_rules from file
+│   │
+│   ├── middleware/
+│   │   ├── __init__.py
+│   │   ├── request_parser.py       # parse_request
+│   │   └── whitelist.py            # is_whitelisted
+│   │
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── logger.py               # log_event
+│   │   ├── reporter.py             # export_report
+│   │   └── blockers.py             # block_request
+│   │
+│   └── dashboard/
+│       ├── __init__.py
+│       ├── app.py                  # Flask dashboard app
+│       ├── routes.py               # Dashboard routes
+│       ├── templates/
+│       │   ├── base.html
+│       │   ├── dashboard.html
+│       │   ├── logs.html
+│       │   ├── rules.html
+│       │   └── blocked.html
+│       └── static/
+│           ├── css/
+│           │   └── style.css
+│           ├── js/
+│           │   └── dashboard.js
+│           └── img/
+│               └── logo.png
+│
+├── tests/
+│   ├── __init__.py
+│   ├── test_detection.py
+│   ├── test_rate_limiter.py
+│   ├── test_proxy.py
+│   └── test_rules_engine.py
+│
+├── logs/
+│   ├── .gitkeep
+│   └── waf.log                     # Created at runtime
+│
+├── reports/
+│   ├── .gitkeep
+│   └── incident_report.md          # Generated reports
+│
+├── scripts/
+│   ├── start_waf.py                # Main entry point
+│   ├── reload_config.sh
+│   └── test_attack.py              # Demo attack scripts for testing
+│
+└── docs/
+    ├── architecture.md
+    ├── rules_format.md
+    ├── configuration.md
+    └── api_reference.md
+
+

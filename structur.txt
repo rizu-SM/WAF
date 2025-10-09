@@ -96,3 +96,22 @@ PyWAF/
     └── api_reference.md
 
 
+
+next step to build 
+Phase 1: Core Detection
+
+src/core/config_loader.py
+
+src/core/waf.py
+
+src/middleware/request_parser.py
+
+src/utils/logger.py
+
+Phase 2: Security Features
+5. src/security/rate_limiter.py
+6. src/security/ip_manager.py
+
+Phase 3: Additional Detectors
+7. src/detection/xss.py
+8. src/detection/path_traversal.py

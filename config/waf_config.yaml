@@ -1,0 +1,27 @@
+waf:
+  enabled: true
+  mode: block
+  max_payload_length: 2000
+
+detection:
+  sql_injection:
+    enabled: true
+    min_confidence: medium
+  xss:
+    enabled: true
+  path_traversal:
+    enabled: true
+
+security:
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 100
+    block_duration: 300
+  bruteforce_protection:
+    enabled: true
+    max_attempts: 5
+    window_minutes: 10
+
+logging:
+  level: INFO
+  file: logs/waf.log

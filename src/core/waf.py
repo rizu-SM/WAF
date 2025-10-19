@@ -183,7 +183,7 @@ class PyWAF:
                     results["high_confidence_attack"] = True
                 results["block_recommended"] = True
         
-        # TODO: Add other detectors
+        #  Add other detectors
         # if self.config_loader.is_detection_enabled("xss"):
         #     xss_patterns = self.rules.get('xss', [])
         #     xss_attack, xss_details = detect_xss(request_dict, xss_patterns)

@@ -429,5 +429,3 @@ if __name__ == "__main__":
     print(f"  Paths: {loader.get_whitelist_paths()}")
     
     print("\n All tests passed!")
-
-

@@ -15,6 +15,9 @@ class HTTPRequestParser:
     """
     Parses raw HTTP requests into standardized WAFRequest objects.
     Handles various HTTP versions and formats.
+    url:"get"
+    /d//
+    
     """
     
     def __init__(self):

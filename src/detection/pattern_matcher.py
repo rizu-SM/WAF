@@ -20,7 +20,7 @@ def compile_pattern(pat):
     """Return compiled regex; cache it to improve performance."""
     if pat in _precompiled_cache:
         return _precompiled_cache[pat]
-    regex = re.compile(pat, re.IGNORECASE)  #re.compile() turns the string pattern into a compiled regex object.
+    regex = re.compile(pat, re.IGNORECASE)  #re.compile("sami") turns the string pattern into a compiled regex object.
                                             #re.IGNORECASE makes the regex case-insensitive (e.g. “SELECT” or “select” both match).
     _precompiled_cache[pat] = regex #After compiling, we store the compiled regex in the cache dictionary
     return regex

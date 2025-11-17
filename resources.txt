@@ -1,0 +1,6 @@
+os module in python : https://www.youtube.com/watch?v=tJxcKyFMTGo
+dataclasses : https://www.youtube.com/watch?v=5mMpM8zK4pY
+pathlib : https://www.youtube.com/watch?v=yxa-DJuuTBI
+with statement : https://www.youtube.com/watch?v=iba-I4CrmyA
+compiled regex (re library) : https://docs.python.org/3/library/re.html
+youtub video for regular expression (re): https://www.youtube.com/watch?v=wnuBwl2ekmo&

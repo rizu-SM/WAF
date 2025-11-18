@@ -1,11 +1,12 @@
 # src/core/waf.py
-import logging #For recording events and errors
-from typing import Dict, Any, Optional #
+import logging
+from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
 from urllib.parse import parse_qs
 
 from .config_loader import get_config_loader
 from src.detection.sql_injection import detect_sql_injection
+from src.utils.logger import get_waf_logger, setup_logging  # ← ADD THIS
 
 @dataclass
 class WAFRequest:
@@ -34,7 +35,10 @@ class PyWAF:
     """
     
     def __init__(self):
+        # ✅ CHANGE: Use WAFLogger instead of basic logger
         self.logger = logging.getLogger(__name__)
+        self.waf_logger = get_waf_logger()  # ← ADD THIS
+        
         self.config_loader = get_config_loader()
         
         # Load initial configuration
@@ -49,12 +53,24 @@ class PyWAF:
             "blocked_requests": 0,
             "allowed_requests": 0,
             "challenges_issued": 0,
-            "by_attack_type": {}  # Will store: {type: {detected, blocked, logged}}
+            "by_attack_type": {}
         }
         
         self.logger.info("PyWAF initialized successfully")
         self.logger.info(f"Mode: {self.config['waf']['mode']}")
         self.logger.info(f"Backend: {self.config['waf']['backend_url']}")
+        
+        # ✅ ADD: Setup file logging based on config
+        log_config = self.config.get('logging', {})
+        log_file = log_config.get('file', 'logs/waf.log')
+        use_json = log_config.get('format', 'text') == 'json'
+        
+        self.waf_logger.setup_file_logging(
+            log_file=log_file,
+            max_size_mb=log_config.get('max_size_mb', 100),
+            backup_count=log_config.get('backup_count', 5),
+            use_json=use_json
+        )
     
     def process_request(self, request: WAFRequest) -> WAFResponse:
         """
@@ -74,27 +90,30 @@ class PyWAF:
             self.logger.debug("WAF disabled - allowing request")
             self.stats["allowed_requests"] += 1
             return WAFResponse(allowed=True, action="allow", reason="waf_disabled")
-        #If WAF is disabled: Let EVERYONE through without checks
-
         
         # Step 2: Whitelist checks
         whitelist_check = self._check_whitelists(request)
         if whitelist_check:
-            self.logger.debug(f"Request whitelisted: {whitelist_check}")
+            # ✅ CHANGE: Use structured logging
+            self.waf_logger.log_whitelist_bypass(
+                client_ip=request.client_ip,
+                reason=whitelist_check,
+                path=request.path
+            )
             self.stats["allowed_requests"] += 1
             return WAFResponse(allowed=True, action="allow", reason=whitelist_check)
         
         # Step 3: Build request dictionary for detectors
-        request_dict = self._build_request_dict(request) #defined below , it Transforms the WAFRequest into a standardized format that all security detectors can understand.
+        request_dict = self._build_request_dict(request)
         
         # Step 4: Run security detectors
-        detection_results = self._run_detectors(request_dict) # defined below , Runs ALL security checks against the request and collects results.
+        detection_results = self._run_detectors(request_dict)
         
         # Step 5: Make final decision
         final_decision = self._make_decision(detection_results, request)
         
-        # Step 6: Log decision
-        self._log_decision(request, final_decision)
+        # Step 6: Log decision (using WAFLogger)
+        self._log_decision_structured(request, final_decision, detection_results)
         
         # Step 7: Update statistics
         self._update_stats(final_decision, detection_results)
@@ -121,7 +140,6 @@ class PyWAF:
         body_params = {}
         if request.body and request.method in ['POST', 'PUT', 'PATCH']:
             try:
-                # Parse URL-encoded form data: username=admin&password=123
                 body_params = {
                     k: v[0] if len(v) == 1 else v 
                     for k, v in parse_qs(request.body).items()
@@ -165,7 +183,7 @@ class PyWAF:
             })
             results["high_confidence_attack"] = True
             results["block_recommended"] = True
-            return results  # Don't waste time on further checks
+            return results
         
         # Check 2: SQL Injection Detection
         if self.config_loader.is_detection_enabled("sql_injection"):
@@ -183,12 +201,7 @@ class PyWAF:
                     results["high_confidence_attack"] = True
                 results["block_recommended"] = True
         
-        #  Add other detectors
-        # if self.config_loader.is_detection_enabled("xss"):
-        #     xss_patterns = self.rules.get('xss', [])
-        #     xss_attack, xss_details = detect_xss(request_dict, xss_patterns)
-        #     if xss_attack:
-        #         results["detections"].append(...) 
+        # TODO: Add other detectors
         
         return results
     
@@ -262,23 +275,45 @@ class PyWAF:
                 }
             )
         
-        # Fallback - should never reach here
+        # Fallback
         return WAFResponse(allowed=True, action="allow", reason="fallback")
     
-    def _log_decision(self, request: WAFRequest, decision: WAFResponse):
-        """Log the WAF decision"""
-        log_msg = (
-            f"{request.method} {request.path} from {request.client_ip} - "
-            f"Action: {decision.action} ({decision.reason})"
-        )
+    def _log_decision_structured(self, request: WAFRequest, decision: WAFResponse, 
+                                 detection_results: Dict[str, Any]) -> None:
+        """
+        ✅ NEW: Log decision using structured WAFLogger
+        This replaces the old _log_decision method
+        """
+        detection_count = len(detection_results.get("detections", []))
         
-        if decision.allowed:
-            if "logged" in decision.reason:
-                self.logger.warning(f"LOGGED: {log_msg}")
-            else:
-                self.logger.info(f"ALLOWED: {log_msg}")
+        if not decision.allowed:
+            # Request was blocked or challenged
+            if decision.action == "block":
+                attack_type = decision.details.get("attack_type", "unknown")
+                self.waf_logger.log_request_blocked(
+                    reason=decision.reason,
+                    attack_type=attack_type,
+                    client_ip=request.client_ip,
+                    details={
+                        "method": request.method,
+                        "path": request.path,
+                        "confidence": decision.confidence,
+                        "detection_details": decision.details.get("detection_details", {})
+                    }
+                )
+            elif decision.action == "challenge":
+                self.waf_logger.log_challenge_issued(
+                    client_ip=request.client_ip,
+                    challenge_type=decision.details.get("challenge_type", "captcha"),
+                    reason=decision.reason
+                )
         else:
-            self.logger.warning(f"BLOCKED: {log_msg}")
+            # Request was allowed
+            self.waf_logger.log_request_allowed(
+                client_ip=request.client_ip,
+                path=request.path,
+                detection_count=detection_count
+            )
     
     def _update_stats(self, decision: WAFResponse, detections: Dict[str, Any]):
         """Update WAF statistics"""
@@ -308,14 +343,6 @@ class PyWAF:
                 self.stats["by_attack_type"][attack_type]["blocked"] += 1
             elif decision.action == "allow" and "logged" in decision.reason:
                 self.stats["by_attack_type"][attack_type]["logged"] += 1
-        #self.state will be in this formate
-        #self.stats = {
-        #    "total_requests": 0,
-        #   "blocked_requests": 0,
-        #    "allowed_requests": 0,
-        #    "challenges_issued": 0,
-        #    "by_attack_type": {}  # Empty dictionary
-        #}
     
     def reload_configuration(self) -> bool:
         """Reload all configuration and rules"""
@@ -325,6 +352,14 @@ class PyWAF:
                 self.rules = self.config_loader.get_rules()
                 self.whitelist_ips = self.config_loader.get_whitelist_ips()
                 self.whitelist_paths = self.config_loader.get_whitelist_paths()
+                
+                # ✅ ADD: Log configuration reload
+                self.waf_logger.log_config_change(
+                    component="waf",
+                    action="reload",
+                    details={"mode": self.config['waf']['mode']}
+                )
+                
                 self.logger.info("Configuration reloaded successfully")
                 return True
         except Exception as e:
@@ -343,11 +378,27 @@ class PyWAF:
         else:
             stats["block_rate"] = 0.0
         
+        # ✅ ADD: Include logger statistics
+        stats["logger_stats"] = self.waf_logger.get_stats()
+        
         return stats
+    
+    def get_recent_events(self, limit: int = 100, event_type: str = None) -> list:
+        """
+        ✅ NEW: Get recent security events (for dashboard)
+        
+        Args:
+            limit: Maximum number of events to return
+            event_type: Filter by event type (optional)
+            
+        Returns:
+            List of recent security events
+        """
+        return self.waf_logger.get_recent_events(limit, event_type)
     
     def health_check(self) -> Dict[str, Any]:
         """Perform health check of WAF components"""
-        total_patterns = sum(len(patterns) for patterns in self.rules.values()) #How many security patterns are loaded across all rule categories.
+        total_patterns = sum(len(patterns) for patterns in self.rules.values())
         
         return {
             "status": "healthy",
@@ -369,7 +420,8 @@ class PyWAF:
                     2
                 )
                 if self.stats["total_requests"] > 0 else 0.0
-            )
+            ),
+            "events_stored": len(self.waf_logger.security_events)  # ✅ ADD
         }
 
 
@@ -378,45 +430,28 @@ _waf_instance = None
 
 def get_waf() -> PyWAF:
     """Get or create singleton WAF instance"""
-    global _waf_instance #_waf_instance is a global variable that stores the single WAF instance
+    global _waf_instance
     if _waf_instance is None:
         _waf_instance = PyWAF()
     return _waf_instance
-#Ensures only ONE instance of PyWAF exists throughout your entire application.
-
 
 
 # Self-test
 if __name__ == "__main__":
-    import logging
-    from logging.handlers import RotatingFileHandler
+    from src.utils.logger import setup_logging
     
-    # ADD PROPER FILE LOGGING SETUP
-    log_file = "logs/waf.log"
-    
-    # Create logs directory if it doesn't exist
-    import os
-    os.makedirs("logs", exist_ok=True)
-    
-    # Set up both console AND file logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            RotatingFileHandler(
-                log_file,
-                maxBytes=10*1024*1024,  # 10MB
-                backupCount=5
-            ),
-            logging.StreamHandler()  # Also show in console
-        ]
-    )
-    
-    print("Testing PyWAF Core Engine\n")
+    # ✅ CHANGE: Use WAFLogger setup instead of basic logging
+    print("Testing PyWAF Core Engine with Enhanced Logging\n")
     print("="*60)
     
-    waf = get_waf()
+    # Setup logging (console + file with JSON)
+    waf_logger = setup_logging(
+        log_file="logs/waf.log",
+        use_json=True,
+        console_level=logging.INFO
+    )
     
+    waf = get_waf()
     
     # Test 1: Clean request
     print("\n[TEST 1] Clean Request")
@@ -445,7 +480,6 @@ if __name__ == "__main__":
     result = waf.process_request(sql_query_request)
     print(f"Result: {result.action} - {result.reason}")
     print(f"Allowed: {result.allowed}")
-    print(f"Details: {result.details}")
     
     # Test 3: SQL injection in POST body
     print("\n[TEST 3] SQL Injection in POST Body")
@@ -460,7 +494,6 @@ if __name__ == "__main__":
     result = waf.process_request(sql_body_request)
     print(f"Result: {result.action} - {result.reason}")
     print(f"Allowed: {result.allowed}")
-    print(f"Details: {result.details}")
     
     # Test 4: Whitelisted IP
     print("\n[TEST 4] Whitelisted IP (127.0.0.1)")
@@ -469,12 +502,19 @@ if __name__ == "__main__":
         path="/admin",
         headers={"user-agent": "curl/7.0"},
         client_ip="127.0.0.1",
-        query_params={"action": "' DROP TABLE users--"}  # Attack, but whitelisted
+        query_params={"action": "' DROP TABLE users--"}
     )
     
     result = waf.process_request(whitelist_request)
     print(f"Result: {result.action} - {result.reason}")
     print(f"Allowed: {result.allowed}")
+    
+    # ✅ NEW: Show recent events
+    print("\n" + "="*60)
+    print("📋 Recent Security Events:")
+    events = waf.get_recent_events(limit=5)
+    for i, event in enumerate(events, 1):
+        print(f"{i}. {event['event_type']} - {event['client_ip']} - {event.get('action', 'N/A')}")
     
     # Show statistics
     print("\n" + "="*60)
@@ -493,6 +533,10 @@ if __name__ == "__main__":
             print(f"    Blocked: {counts['blocked']}")
             print(f"    Logged: {counts['logged']}")
     
+    # Logger statistics
+    logger_stats = stats.get('logger_stats', {})
+    print(f"\nLogger: {logger_stats.get('total_events', 0)} events stored")
+    
     # Health check
     print("\n" + "="*60)
     print("🏥 Health Check:")
@@ -501,3 +545,4 @@ if __name__ == "__main__":
         print(f"  {key}: {value}")
     
     print("\n✅ WAF core engine test completed!")
+    print(f"📁 Logs saved to: logs/waf.log")

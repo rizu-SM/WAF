@@ -28,5 +28,20 @@
     "(?i)expression\\s*\\(",
     "(?i)vbscript\\s*:",
     "(?i)data\\s*:\\s*text/html"
+  ],
+  "path_traversal": [
+    "(?i)\\.\\.\\/",
+    "(?i)\\.\\.\\\\",
+    "(?i)%2e%2e[\\/]",
+    "(?i)%252e%252e",
+    "(?i)\\.\\.\\/.*etc\\/passwd",
+    "(?i)etc\\/shadow",
+    "(?i)windows[\\/]system32",
+    "(?i)boot\\.ini",
+    "(?i)win\\.ini",
+    "(?i)%00",
+    "(?i)\\/proc\\/self",
+    "(?i)c:\\\\windows",
+    "(?i)[\\/]etc[\\/](?:passwd|shadow|hosts)"
   ]
 }

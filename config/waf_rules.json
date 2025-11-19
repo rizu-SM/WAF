@@ -10,5 +10,23 @@
     "outfile",
     "concat\\s*\\(",
     "into\\s+outfile"
+  ],
+  "xss": [
+    "(?i)<script[^>]*>.*?</script>",
+    "(?i)javascript\\s*:",
+    "(?i)on\\w+\\s*=\\s*['\"]?[^'\"]*['\"]?",
+    "(?i)<iframe[^>]*>",
+    "(?i)<object[^>]*>",
+    "(?i)<embed[^>]*>",
+    "(?i)eval\\s*\\(",
+    "(?i)alert\\s*\\(",
+    "(?i)document\\.cookie",
+    "(?i)document\\.write",
+    "(?i)window\\.location",
+    "(?i)<img[^>]*onerror",
+    "(?i)<svg[^>]*onload",
+    "(?i)expression\\s*\\(",
+    "(?i)vbscript\\s*:",
+    "(?i)data\\s*:\\s*text/html"
   ]
 }

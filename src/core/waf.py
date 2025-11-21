@@ -6,6 +6,8 @@ from urllib.parse import parse_qs
 
 from .config_loader import get_config_loader
 from src.detection.sql_injection import detect_sql_injection
+from src.detection.xss import detect_xss
+from src.detection.path_traversal import detect_path_traversal
 from src.utils.logger import get_waf_logger, setup_logging  # ← ADD THIS
 
 @dataclass
@@ -201,7 +203,37 @@ class PyWAF:
                     results["high_confidence_attack"] = True
                 results["block_recommended"] = True
         
-        # TODO: Add other detectors
+        # Check 3: XSS Detection
+        if self.config_loader.is_detection_enabled("xss"):
+            xss_patterns = self.rules.get('xss', [])
+            xss_attack, xss_details = detect_xss(request_dict, xss_patterns)
+            
+            if xss_attack:
+                self.logger.debug(f"XSS attack detected: {xss_details}")
+                results["detections"].append({
+                    "type": "xss",
+                    "details": xss_details,
+                    "confidence": xss_details.get("confidence", "medium")
+                })
+                if xss_details.get("confidence") == "high":
+                    results["high_confidence_attack"] = True
+                results["block_recommended"] = True
+        
+        # Check 4: Path Traversal Detection
+        if self.config_loader.is_detection_enabled("path_traversal"):
+            path_patterns = self.rules.get('path_traversal', [])
+            path_attack, path_details = detect_path_traversal(request_dict, path_patterns)
+            
+            if path_attack:
+                self.logger.debug(f"Path traversal detected: {path_details}")
+                results["detections"].append({
+                    "type": "path_traversal",
+                    "details": path_details,
+                    "confidence": path_details.get("confidence", "medium")
+                })
+                if path_details.get("confidence") == "high":
+                    results["high_confidence_attack"] = True
+                results["block_recommended"] = True
         
         return results
     
@@ -495,8 +527,36 @@ if __name__ == "__main__":
     print(f"Result: {result.action} - {result.reason}")
     print(f"Allowed: {result.allowed}")
     
-    # Test 4: Whitelisted IP
-    print("\n[TEST 4] Whitelisted IP (127.0.0.1)")
+    # Test 4: XSS attack
+    print("\n[TEST 4] XSS Attack in Query Parameter")
+    xss_request = WAFRequest(
+        method="GET",
+        path="/comment",
+        headers={"user-agent": "Mozilla/5.0"},
+        client_ip="192.168.1.202",
+        query_params={"msg": "<script>alert('XSS')</script>"}
+    )
+    
+    result = waf.process_request(xss_request)
+    print(f"Result: {result.action} - {result.reason}")
+    print(f"Allowed: {result.allowed}")
+    
+    # Test 5: Path Traversal attack
+    print("\n[TEST 5] Path Traversal Attack")
+    path_traversal_request = WAFRequest(
+        method="GET",
+        path="/files",
+        headers={"user-agent": "Mozilla/5.0"},
+        client_ip="192.168.1.203",
+        query_params={"file": "../../etc/passwd"}
+    )
+    
+    result = waf.process_request(path_traversal_request)
+    print(f"Result: {result.action} - {result.reason}")
+    print(f"Allowed: {result.allowed}")
+    
+    # Test 6: Whitelisted IP
+    print("\n[TEST 6] Whitelisted IP (127.0.0.1)")
     whitelist_request = WAFRequest(
         method="GET",
         path="/admin",

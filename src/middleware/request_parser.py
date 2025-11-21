@@ -143,6 +143,63 @@ def parse_http_request(raw_request: bytes, client_ip: str = "") -> WAFRequest:
     return get_request_parser().parse_http_request(raw_request, client_ip)
 
 
+class RequestParser:
+    """
+    Flask request adapter for WAF integration.
+    Converts Flask request objects into WAFRequest objects.
+    """
+    
+    @staticmethod
+    def parse_request(flask_request) -> WAFRequest:
+        """
+        Parse Flask request object into WAFRequest
+        
+        Args:
+            flask_request: Flask request object
+            
+        Returns:
+            WAFRequest object
+        """
+        from flask import Request
+        
+        # Extract all data from Flask request
+        method = flask_request.method.upper()
+        path = flask_request.path
+        
+        # Get headers as dictionary
+        headers = {k.lower(): v for k, v in flask_request.headers.items()}
+        
+        # Get query parameters
+        query_params = {k: v for k, v in flask_request.args.items()}
+        
+        # Get body data (form data, JSON, or raw)
+        body = ""
+        if flask_request.is_json:
+            import json
+            body = json.dumps(flask_request.get_json(silent=True) or {})
+        elif flask_request.form:
+            body = "&".join([f"{k}={v}" for k, v in flask_request.form.items()])
+        elif flask_request.data:
+            body = flask_request.data.decode('utf-8', errors='replace')
+        
+        # Get client IP (handle proxies)
+        client_ip = flask_request.headers.get('X-Forwarded-For', 
+                    flask_request.headers.get('X-Real-IP', 
+                    flask_request.remote_addr or '0.0.0.0'))
+        
+        if ',' in client_ip:
+            client_ip = client_ip.split(',')[0].strip()
+        
+        return WAFRequest(
+            method=method,
+            path=path,
+            headers=headers,
+            body=body,
+            client_ip=client_ip,
+            query_params=query_params
+        )
+
+
 # Self-test
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')

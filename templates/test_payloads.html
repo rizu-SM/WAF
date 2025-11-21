@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Test Payloads - WAF Protected Site{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Test Payloads</h1>
+    <p>Example malicious payloads to test WAF protection</p>
+</div>
+
+<div class="content">
+    <section class="payload-section">
+        <h2>SQL Injection Payloads</h2>
+        <div class="payload-list">
+            <div class="payload-item">
+                <code>' OR '1'='1</code>
+                <button onclick="testPayload('/api/users?id=' + encodeURIComponent(\"' OR '1'='1\"))" class="btn btn-sm">Test</button>
+            </div>
+            <div class="payload-item">
+                <code>' UNION SELECT * FROM users--</code>
+                <button onclick="testPayload('/api/users?filter=' + encodeURIComponent(\"' UNION SELECT * FROM users--\"))" class="btn btn-sm">Test</button>
+            </div>
+            <div class="payload-item">
+                <code>1; DROP TABLE users--</code>
+                <button onclick="testPayload('/api/users?id=' + encodeURIComponent('1; DROP TABLE users--'))" class="btn btn-sm">Test</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="payload-section">
+        <h2>XSS Payloads</h2>
+        <div class="payload-list">
+            <div class="payload-item">
+                <code>&lt;script&gt;alert('XSS')&lt;/script&gt;</code>
+                <button onclick="testPayload('/search?q=' + encodeURIComponent('<script>alert(1)</script>'))" class="btn btn-sm">Test</button>
+            </div>
+            <div class="payload-item">
+                <code>&lt;img src=x onerror=alert(1)&gt;</code>
+                <button onclick="testPayload('/search?q=' + encodeURIComponent('<img src=x onerror=alert(1)>'))" class="btn btn-sm">Test</button>
+            </div>
+            <div class="payload-item">
+                <code>&lt;svg onload=alert(1)&gt;</code>
+                <button onclick="testPayload('/search?q=' + encodeURIComponent('<svg onload=alert(1)>'))" class="btn btn-sm">Test</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="payload-section">
+        <h2>Path Traversal Payloads</h2>
+        <div class="payload-list">
+            <div class="payload-item">
+                <code>../../../etc/passwd</code>
+                <button onclick="testPayload('/files?file=' + encodeURIComponent('../../../etc/passwd'))" class="btn btn-sm">Test</button>
+            </div>
+            <div class="payload-item">
+                <code>..\\..\\..\\windows\\system32\\config\\sam</code>
+                <button onclick="testPayload('/files?file=' + encodeURIComponent('..\\..\\..\\windows\\system32\\config\\sam'))" class="btn btn-sm">Test</button>
+            </div>
+            <div class="payload-item">
+                <code>....//....//....//etc/passwd</code>
+                <button onclick="testPayload('/files?file=' + encodeURIComponent('....//....//....//etc/passwd'))" class="btn btn-sm">Test</button>
+            </div>
+        </div>
+    </section>
+
+    <div id="testResult" class="test-result" style="display: none;"></div>
+</div>
+
+<script>
+async function testPayload(url) {
+    const resultDiv = document.getElementById('testResult');
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = '<p>Testing payload...</p>';
+    
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (response.status === 403) {
+            resultDiv.className = 'test-result blocked';
+            resultDiv.innerHTML = `
+                <h3>✅ Blocked by WAF</h3>
+                <p><strong>Reason:</strong> ${data.reason}</p>
+                <p><strong>URL:</strong> ${url}</p>
+            `;
+        } else {
+            resultDiv.className = 'test-result allowed';
+            resultDiv.innerHTML = `
+                <h3>⚠️ Allowed (Potential Bypass)</h3>
+                <p><strong>Status:</strong> ${response.status}</p>
+                <p><strong>URL:</strong> ${url}</p>
+            `;
+        }
+    } catch (error) {
+        resultDiv.className = 'test-result error';
+        resultDiv.innerHTML = `
+            <h3>❌ Error</h3>
+            <p>${error.message}</p>
+        `;
+    }
+}
+</script>
+{% endblock %}

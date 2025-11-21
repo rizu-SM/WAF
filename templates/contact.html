@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Contact - WAF Protected Site{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Contact Us</h1>
+    <p>Send us a message (Try injecting malicious code to test WAF)</p>
+</div>
+
+<div class="content">
+    <form id="contactForm" method="POST" class="contact-form">
+        <div class="form-group">
+            <label for="name">Name:</label>
+            <input type="text" id="name" name="name" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="message">Message:</label>
+            <textarea id="message" name="message" rows="5" required></textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Send Message</button>
+    </form>
+
+    <div id="response" class="response-message" style="display: none;"></div>
+
+    <div class="test-hints">
+        <h3>Test Payloads to Try:</h3>
+        <ul>
+            <li><code>&lt;script&gt;alert('XSS')&lt;/script&gt;</code></li>
+            <li><code>' OR '1'='1</code></li>
+            <li><code>&lt;img src=x onerror=alert('XSS')&gt;</code></li>
+            <li><code>' UNION SELECT * FROM users--</code></li>
+        </ul>
+        <p><em>These should be blocked by the WAF</em></p>
+    </div>
+</div>
+
+<script>
+document.getElementById('contactForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const response = document.getElementById('response');
+    
+    try {
+        const result = await fetch('/contact', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await result.json();
+        
+        if (result.ok) {
+            response.className = 'response-message success';
+            response.textContent = data.message;
+        } else {
+            response.className = 'response-message error';
+            response.textContent = 'WAF Blocked: ' + data.reason;
+        }
+        
+        response.style.display = 'block';
+    } catch (error) {
+        response.className = 'response-message error';
+        response.textContent = 'Error: ' + error.message;
+        response.style.display = 'block';
+    }
+});
+</script>
+{% endblock %}

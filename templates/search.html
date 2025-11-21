@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Search - WAF Protected Site{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Search</h1>
+    <p>Search our site (Try XSS payloads in the search query)</p>
+</div>
+
+<div class="content">
+    <form method="GET" class="search-form">
+        <div class="form-group">
+            <input type="text" name="q" value="{{ query }}" placeholder="Enter search term..." class="search-input">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </div>
+    </form>
+
+    {% if query %}
+    <div class="search-results">
+        <h2>Search Results for: <span class="query-text">{{ query }}</span></h2>
+        <p>No results found. This is a test page.</p>
+    </div>
+    {% endif %}
+
+    <div class="test-hints">
+        <h3>XSS Test Payloads:</h3>
+        <ul>
+            <li><code>?q=&lt;script&gt;alert(1)&lt;/script&gt;</code></li>
+            <li><code>?q=&lt;img src=x onerror=alert(1)&gt;</code></li>
+            <li><code>?q=javascript:alert(1)</code></li>
+            <li><code>?q=&lt;svg onload=alert(1)&gt;</code></li>
+        </ul>
+        <p><em>These should be blocked by the WAF</em></p>
+    </div>
+</div>
+{% endblock %}

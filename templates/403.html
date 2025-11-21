@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}403 Forbidden - WAF Blocked{% endblock %}
+
+{% block content %}
+<div class="error-page">
+    <h1>🛡️ 403 Forbidden</h1>
+    <h2>Request Blocked by WAF</h2>
+    <p>Your request has been blocked by the Web Application Firewall.</p>
+    <p>This may be due to:</p>
+    <ul>
+        <li>Malicious payload detected (SQL Injection, XSS, etc.)</li>
+        <li>Path traversal attempt</li>
+        <li>IP address blacklisted</li>
+        <li>Rate limit exceeded</li>
+    </ul>
+    <a href="/" class="btn">Go Home</a>
+</div>
+{% endblock %}

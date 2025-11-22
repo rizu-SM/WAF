@@ -562,8 +562,3 @@ PyWAF implements a **multi-layered, defense-in-depth approach** to web applicati
 This architecture provides robust protection while maintaining flexibility for different deployment scenarios.
 
 ---
-
-**Author**: [Your Name]  
-**Date**: November 22, 2025  
-**Course**: [Course Name]  
-**Institution**: [University Name]

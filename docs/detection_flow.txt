@@ -1,0 +1,35 @@
+User Input
+    ↓
+[1] Build Payload String
+    ("/api/user id=1' UNION SELECT * FROM information_schema.columns--")
+    ↓
+[2] Normalize
+    - URL decode
+    - Lowercase
+    - Trim whitespace
+    ("/api/user id=1' union select * from information_schema.columns--")
+    ↓
+[3] Load Patterns from waf_rules.json
+    ["information_schema", "union.*select", ...]
+    ↓
+[4] For Each Pattern:
+    ├─ Compile to regex
+    ├─ Search in normalized payload
+    └─ If match found → Add to hits[]
+    ↓
+[5] Check Results
+    ├─ If hits.length > 0 → ATTACK DETECTED
+    └─ Else → CLEAN REQUEST
+    ↓
+[6] Return Detection Result
+    {
+      "is_attack": true,
+      "reason": "regex",
+      "hits": ["information_schema"],
+      "confidence": "high"
+    }
+    ↓
+[7] WAF Decision
+    ├─ Mode = "block" → HTTP 403 Forbidden
+    ├─ Mode = "log" → Log + Allow
+    └─ Mode = "challenge" → CAPTCHA

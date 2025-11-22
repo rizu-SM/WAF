@@ -1,2 +1,4 @@
 note.txt
 learn.py
+logs/
+__pycache__/

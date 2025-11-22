@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}File Viewer{% endblock %}
+
+{% block content %}
+<h1>📁 File Viewer</h1>
+
+<div class="alert alert-warning">
+    <strong>⚠️ Path Traversal Vulnerability:</strong> This file viewer doesn't validate paths,
+    but the WAF prevents directory traversal attacks.
+</div>
+
+<form method="GET" action="/files" style="margin: 30px 0;">
+    <div class="form-group">
+        <label for="file">File Path:</label>
+        <input type="text" id="file" name="file" value="{{ filename }}" placeholder="Enter file path...">
+    </div>
+    <button type="submit" class="btn btn-primary">View File</button>
+</form>
+
+{% if filename %}
+<h2>File: {{ filename }}</h2>
+<div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+    <pre style="white-space: pre-wrap; word-wrap: break-word;">{{ content }}</pre>
+</div>
+{% endif %}
+
+<div style="margin: 40px 0;">
+    <h3>🧪 Test Path Traversal Payloads (All will be BLOCKED by WAF):</h3>
+    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+        <strong>Attack Examples:</strong>
+        <ul style="margin-top: 10px; line-height: 2;">
+            <li><code>../../etc/passwd</code></li>
+            <li><code>..\\..\\windows\\system32\\config\\sam</code></li>
+            <li><code>%2e%2e%2f%2e%2e%2fetc%2fpasswd</code></li>
+            <li><code>/etc/shadow</code></li>
+            <li><code>../../etc/passwd%00.jpg</code></li>
+        </ul>
+    </div>
+    
+    <h3 style="margin-top: 20px;">✅ Safe File Access:</h3>
+    <div style="background: #e8f5e9; padding: 15px; border-radius: 5px;">
+        <ul style="line-height: 2;">
+            <li><a href="/files?file=welcome.txt"><code>welcome.txt</code></a></li>
+            <li><a href="/files?file=README.md"><code>README.md</code></a></li>
+        </ul>
+    </div>
+</div>
+
+{% endblock %}

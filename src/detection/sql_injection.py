@@ -48,7 +48,8 @@ def build_payload_string(req_dict: dict) -> str:
         parts.append(str(args)) 
     parts.append(req_dict.get("body", "") or "")
     headers = req_dict.get("headers") or {}
-    for h in ("user-agent", "referer", "x-forwarded-for", "cookie"):
+    # Skip cookie header to avoid false positives from session tokens
+    for h in ("user-agent", "referer", "x-forwarded-for"):
         if headers.get(h):
             parts.append(headers.get(h))
     payload = " ".join(parts)

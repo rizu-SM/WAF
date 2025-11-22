@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}WAF Statistics{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin: 10px;
+        flex: 1;
+        min-width: 200px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .stat-value {
+        font-size: 36px;
+        font-weight: bold;
+        margin: 10px 0;
+    }
+    
+    .stat-label {
+        font-size: 14px;
+        opacity: 0.9;
+    }
+    
+    .stats-grid {
+        display: flex;
+        flex-wrap: wrap;
+        margin: 20px -10px;
+    }
+    
+    .event-log {
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        max-height: 400px;
+        overflow-y: auto;
+        margin: 20px 0;
+    }
+    
+    .event-item {
+        padding: 15px;
+        border-bottom: 1px solid #ddd;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+    }
+    
+    .event-item:last-child {
+        border-bottom: none;
+    }
+    
+    .event-blocked {
+        background: #fee;
+        border-left: 4px solid #e74c3c;
+    }
+    
+    .event-allowed {
+        background: #efe;
+        border-left: 4px solid #27ae60;
+    }
+    
+    .event-warning {
+        background: #fef3e0;
+        border-left: 4px solid #f39c12;
+    }
+    
+    .health-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    
+    .health-good {
+        background: #27ae60;
+    }
+    
+    .health-warning {
+        background: #f39c12;
+    }
+    
+    .health-bad {
+        background: #e74c3c;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>🛡️ WAF Statistics Dashboard</h1>
+
+<div class="alert alert-success">
+    <span class="health-indicator health-good"></span>
+    <strong>WAF Status:</strong> {{ health.status|upper }} | 
+    <strong>Mode:</strong> {{ health.mode|upper }} |
+    <strong>Requests Processed:</strong> {{ stats.total_requests }}
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Total Requests</div>
+        <div class="stat-value">{{ stats.total_requests }}</div>
+    </div>
+    
+    <div class="stat-card" style="background: linear-gradient(135deg, #27ae60 0%, #229954 100%);">
+        <div class="stat-label">Allowed</div>
+        <div class="stat-value">{{ stats.allowed_requests }}</div>
+    </div>
+    
+    <div class="stat-card" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);">
+        <div class="stat-label">Blocked</div>
+        <div class="stat-value">{{ stats.blocked_requests }}</div>
+    </div>
+    
+    <div class="stat-card" style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);">
+        <div class="stat-label">Block Rate</div>
+        <div class="stat-value">{{ stats.block_rate }}%</div>
+    </div>
+</div>
+
+<h2>🔍 Detection Engines Status</h2>
+<div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+        {% for detector, enabled in health.detectors_enabled.items() %}
+        <div style="padding: 10px; background: white; border-radius: 5px;">
+            <span class="health-indicator {% if enabled %}health-good{% else %}health-bad{% endif %}"></span>
+            <strong>{{ detector.replace('_', ' ').title() }}</strong>
+            <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                {{ 'ENABLED' if enabled else 'DISABLED' }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% if stats.by_attack_type %}
+<h2>🎯 Attacks by Type</h2>
+<div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+    {% for attack_type, counts in stats.by_attack_type.items() %}
+    <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 5px;">
+        <h3 style="color: #667eea; margin-bottom: 10px;">{{ attack_type.replace('_', ' ').title() }}</h3>
+        <div style="display: flex; gap: 30px;">
+            <div>
+                <strong>Detected:</strong> {{ counts.detected }}
+            </div>
+            <div>
+                <strong>Blocked:</strong> <span style="color: #e74c3c;">{{ counts.blocked }}</span>
+            </div>
+            <div>
+                <strong>Logged:</strong> <span style="color: #f39c12;">{{ counts.logged }}</span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<h2>📋 Recent Security Events</h2>
+<div class="event-log">
+    {% if events %}
+        {% for event in events[:30] %}
+        <div class="event-item {% if event.event_type == 'request_blocked' %}event-blocked{% elif event.event_type == 'request_allowed' %}event-allowed{% else %}event-warning{% endif %}">
+            <strong>{{ event.timestamp[:19] }}</strong> | 
+            <strong>{{ event.event_type.replace('_', ' ').upper() }}</strong> | 
+            IP: {{ event.client_ip }} | 
+            Action: {{ event.get('action', 'N/A') }}
+            {% if event.get('attack_type') %}
+            | Attack: {{ event.attack_type }}
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="event-item">No events recorded yet.</div>
+    {% endif %}
+</div>
+
+<h2>⚙️ Configuration</h2>
+<div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+        <div>
+            <strong>Total Patterns:</strong> {{ health.total_patterns }}
+        </div>
+        <div>
+            <strong>Whitelisted IPs:</strong> {{ health.whitelisted_ips }}
+        </div>
+        <div>
+            <strong>Whitelisted Paths:</strong> {{ health.whitelisted_paths }}
+        </div>
+        <div>
+            <strong>Backend URL:</strong> {{ health.backend }}
+        </div>
+    </div>
+</div>
+
+<div style="margin: 30px 0;">
+    <a href="/" class="btn btn-primary">Back to Home</a>
+    <button onclick="location.reload()" class="btn btn-primary">Refresh Stats</button>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-refresh every 10 seconds
+    setTimeout(function() {
+        location.reload();
+    }, 10000);
+</script>
+{% endblock %}

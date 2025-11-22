@@ -1,37 +1,61 @@
 {% extends "base.html" %}
 
-{% block title %}Search - WAF Protected Site{% endblock %}
+{% block title %}Search{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>Search</h1>
-    <p>Search our site (Try XSS payloads in the search query)</p>
+<h1>🔍 Search Posts</h1>
+
+<div class="alert alert-warning">
+    <strong>⚠️ XSS Vulnerability:</strong> This search displays results without sanitization,
+    but the WAF blocks XSS attacks before they reach the application.
 </div>
 
-<div class="content">
-    <form method="GET" class="search-form">
-        <div class="form-group">
-            <input type="text" name="q" value="{{ query }}" placeholder="Enter search term..." class="search-input">
-            <button type="submit" class="btn btn-primary">Search</button>
-        </div>
-    </form>
-
-    {% if query %}
-    <div class="search-results">
-        <h2>Search Results for: <span class="query-text">{{ query }}</span></h2>
-        <p>No results found. This is a test page.</p>
+<form method="GET" action="/search" style="margin: 30px 0;">
+    <div class="form-group">
+        <label for="q">Search Query:</label>
+        <input type="text" id="q" name="q" value="{{ query }}" placeholder="Enter search terms...">
     </div>
-    {% endif %}
+    <button type="submit" class="btn btn-primary">Search</button>
+</form>
 
-    <div class="test-hints">
-        <h3>XSS Test Payloads:</h3>
-        <ul>
-            <li><code>?q=&lt;script&gt;alert(1)&lt;/script&gt;</code></li>
-            <li><code>?q=&lt;img src=x onerror=alert(1)&gt;</code></li>
-            <li><code>?q=javascript:alert(1)</code></li>
-            <li><code>?q=&lt;svg onload=alert(1)&gt;</code></li>
+{% if query %}
+<h2>Search Results for: "{{ query|safe }}"</h2>
+
+{% if results %}
+<div style="margin: 20px 0;">
+    {% for post in results %}
+    <div style="background: #f8f9fa; padding: 20px; margin: 15px 0; border-radius: 5px;">
+        <h3>{{ post[1]|safe }}</h3>
+        <p>{{ post[2]|safe }}</p>
+        <small>By {{ post[3] }} on {{ post[4] }}</small>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p>No results found.</p>
+{% endif %}
+{% endif %}
+
+<div style="margin: 40px 0;">
+    <h3>🧪 Test XSS Payloads (All will be BLOCKED by WAF):</h3>
+    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+        <ul style="line-height: 2;">
+            <li><code>&lt;script&gt;alert('XSS')&lt;/script&gt;</code></li>
+            <li><code>&lt;img src=x onerror=alert(1)&gt;</code></li>
+            <li><code>&lt;svg onload=alert('XSS')&gt;</code></li>
+            <li><code>javascript:alert('XSS')</code></li>
+            <li><code>&lt;iframe src="javascript:alert('XSS')"&gt;</code></li>
         </ul>
-        <p><em>These should be blocked by the WAF</em></p>
+    </div>
+    
+    <h3 style="margin-top: 20px;">✅ Safe Searches:</h3>
+    <div style="background: #e8f5e9; padding: 15px; border-radius: 5px;">
+        <ul style="line-height: 2;">
+            <li><code>Welcome</code></li>
+            <li><code>Security</code></li>
+            <li><code>password</code></li>
+        </ul>
     </div>
 </div>
+
 {% endblock %}

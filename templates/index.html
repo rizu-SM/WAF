@@ -1,60 +1,75 @@
 {% extends "base.html" %}
 
-{% block title %}Home - WAF Protected Site{% endblock %}
+{% block title %}Home - Vulnerable Web App{% endblock %}
 
 {% block content %}
-<div class="hero">
-    <h1>Welcome to WAF Test Application</h1>
-    <p class="subtitle">A demonstration website protected by a custom Web Application Firewall</p>
+<h1>🏠 Welcome to the Vulnerable Web Application</h1>
+
+<div class="alert alert-warning">
+    <strong>⚠️ Warning:</strong> This application contains intentional security vulnerabilities for testing purposes.
+    It is protected by the PyWAF (Python Web Application Firewall).
 </div>
 
-<div class="content">
-    <section class="info-section">
-        <h2>About This Application</h2>
-        <p>This is a test web application designed to demonstrate the capabilities of a custom Web Application Firewall (WAF). 
-        The WAF protects against common web vulnerabilities including:</p>
-        
-        <ul class="features">
-            <li>🔒 SQL Injection attacks</li>
-            <li>🔒 Cross-Site Scripting (XSS)</li>
-            <li>🔒 Path Traversal attempts</li>
-            <li>🔒 Rate limiting and DDoS protection</li>
-            <li>🔒 IP-based access control</li>
-        </ul>
-    </section>
+<h2>🎯 Purpose</h2>
+<p>This application demonstrates how a Web Application Firewall (WAF) protects against common web attacks:</p>
 
-    <section class="test-section">
-        <h2>Test Endpoints</h2>
-        <div class="endpoint-grid">
-            <div class="endpoint-card">
-                <h3>Contact Form</h3>
-                <p>Test XSS and SQL injection protection</p>
-                <a href="/contact" class="btn">Try It</a>
-            </div>
-            
-            <div class="endpoint-card">
-                <h3>Search</h3>
-                <p>Test XSS in query parameters</p>
-                <a href="/search?q=test" class="btn">Try It</a>
-            </div>
-            
-            <div class="endpoint-card">
-                <h3>File Viewer</h3>
-                <p>Test path traversal protection</p>
-                <a href="/files?file=test.txt" class="btn">Try It</a>
-            </div>
-            
-            <div class="endpoint-card">
-                <h3>API Users</h3>
-                <p>Test SQL injection in API</p>
-                <a href="/api/users?id=1" class="btn">Try It</a>
-            </div>
-        </div>
-    </section>
-
-    <section class="warning-section">
-        <h3>⚠️ Security Notice</h3>
-        <p>This application is for testing purposes only. The WAF will block malicious requests and log security events.</p>
-    </section>
+<div style="margin: 30px 0;">
+    <h3>🛡️ Protected Attack Vectors:</h3>
+    <ul style="line-height: 2;">
+        <li><strong>SQL Injection:</strong> Login page and API endpoints are vulnerable but protected</li>
+        <li><strong>Cross-Site Scripting (XSS):</strong> Search and post creation are vulnerable but protected</li>
+        <li><strong>Path Traversal:</strong> File viewer is vulnerable but protected</li>
+        <li><strong>Rate Limiting:</strong> Automatic rate limiting prevents abuse</li>
+        <li><strong>IP Blocking:</strong> Malicious IPs are automatically blocked</li>
+    </ul>
 </div>
+
+<h2>🚀 Try It Out</h2>
+<div style="margin: 30px 0;">
+    <h3>Test Attack Examples:</h3>
+    
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+        <h4>1. SQL Injection (Will be BLOCKED by WAF)</h4>
+        <p>Try logging in with:</p>
+        <code style="background: #fff; padding: 10px; display: block; margin: 10px 0;">
+            Username: admin' OR '1'='1'--<br>
+            Password: anything
+        </code>
+        <a href="/login" class="btn btn-primary">Try Login Attack</a>
+    </div>
+    
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+        <h4>2. XSS Attack (Will be BLOCKED by WAF)</h4>
+        <p>Try searching for:</p>
+        <code style="background: #fff; padding: 10px; display: block; margin: 10px 0;">
+            &lt;script&gt;alert('XSS')&lt;/script&gt;
+        </code>
+        <a href="/search" class="btn btn-primary">Try XSS Attack</a>
+    </div>
+    
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+        <h4>3. Path Traversal (Will be BLOCKED by WAF)</h4>
+        <p>Try accessing:</p>
+        <code style="background: #fff; padding: 10px; display: block; margin: 10px 0;">
+            /files?file=../../etc/passwd
+        </code>
+        <a href="/files?file=../../etc/passwd" class="btn btn-primary">Try Path Traversal</a>
+    </div>
+</div>
+
+<h2>📊 Monitor Protection</h2>
+<p>View real-time WAF statistics and blocked attacks:</p>
+<a href="/waf/stats" class="btn btn-primary" style="margin: 20px 0;">View WAF Dashboard</a>
+
+<h2>✅ Legitimate Access</h2>
+<p>Login with valid credentials to access the dashboard:</p>
+<div style="margin: 20px 0;">
+    <strong>Test Accounts:</strong>
+    <ul style="line-height: 2;">
+        <li>Username: <code>admin</code> | Password: <code>admin123</code></li>
+        <li>Username: <code>john</code> | Password: <code>password</code></li>
+    </ul>
+</div>
+<a href="/login" class="btn btn-primary">Login Securely</a>
+
 {% endblock %}

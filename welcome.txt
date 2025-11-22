@@ -1,0 +1,24 @@
+Welcome to the Vulnerable Web Application!
+========================================
+
+This is a test file that can be safely viewed.
+
+This application is intentionally vulnerable but protected by the PyWAF (Python Web Application Firewall).
+
+Features:
+- SQL Injection Protection
+- XSS Attack Prevention
+- Path Traversal Defense
+- Rate Limiting
+- IP Blocking
+
+Try accessing files outside this directory - the WAF will block you!
+
+Safe files to view:
+- welcome.txt (this file)
+- README.md
+
+DO NOT TRY (these will be blocked):
+- ../../etc/passwd
+- ../windows/system32/config/sam
+- Any path traversal attempts

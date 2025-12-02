@@ -14,7 +14,7 @@
   "xss": [
     "(?i)<script[^>]*>.*?</script>",
     "(?i)javascript\\s*:",
-    "(?i)on\\w+\\s*=\\s*['\"]?[^'\"]*['\"]?",
+    "(?i)\\b(onload|onerror|onclick|onmouseover|onfocus|onblur|onchange|onsubmit|onkeydown|onkeyup|onkeypress|ondblclick|onmousedown|onmouseup|oncontextmenu|oninput|onabort|onbeforeunload|onhashchange)\\s*=",
     "(?i)<iframe[^>]*>",
     "(?i)<object[^>]*>",
     "(?i)<embed[^>]*>",

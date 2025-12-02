@@ -8,7 +8,9 @@ from .config_loader import get_config_loader
 from src.detection.sql_injection import detect_sql_injection
 from src.detection.xss import detect_xss
 from src.detection.path_traversal import detect_path_traversal
-from src.utils.logger import get_waf_logger, setup_logging  # ← ADD THIS
+from src.utils.logger import get_waf_logger, setup_logging
+from src.security.ip_manager import get_ip_manager
+from src.security.rate_limiter import create_rate_limiter
 
 @dataclass
 class WAFRequest:
@@ -37,7 +39,7 @@ class PyWAF:
     """
     
     def __init__(self):
-        # ✅ CHANGE: Use WAFLogger instead of basic logger
+        # Use WAFLogger instead of basic logger
         self.logger = logging.getLogger(__name__)
         self.waf_logger = get_waf_logger()  # ← ADD THIS
         
@@ -58,11 +60,31 @@ class PyWAF:
             "by_attack_type": {}
         }
         
+        # Initialize security components (IP Manager & Rate Limiter)
+        security_config = self.config.get('security', {})
+        rate_limit_config = security_config.get('rate_limiting', {})
+        
+        self.ip_manager = get_ip_manager(
+            persist=True,
+            auto_block=True,
+            block_threshold=security_config.get('bruteforce_protection', {}).get('max_attempts', 10),
+            default_block_duration=rate_limit_config.get('block_duration', 300)
+        )
+        
+        self.rate_limiter = create_rate_limiter(
+            requests_per_minute=rate_limit_config.get('requests_per_minute', 100),
+            block_duration=rate_limit_config.get('block_duration', 300)
+        )
+        
+        self.rate_limiting_enabled = rate_limit_config.get('enabled', True)
+        
         self.logger.info("PyWAF initialized successfully")
         self.logger.info(f"Mode: {self.config['waf']['mode']}")
         self.logger.info(f"Backend: {self.config['waf']['backend_url']}")
+        self.logger.info(f"Rate limiting: {'enabled' if self.rate_limiting_enabled else 'disabled'}")
+        self.logger.info(f"IP auto-block threshold: {self.ip_manager.block_threshold} violations")
         
-        # ✅ ADD: Setup file logging based on config
+        # Setup file logging based on config
         log_config = self.config.get('logging', {})
         log_file = log_config.get('file', 'logs/waf.log')
         use_json = log_config.get('format', 'text') == 'json'
@@ -93,10 +115,9 @@ class PyWAF:
             self.stats["allowed_requests"] += 1
             return WAFResponse(allowed=True, action="allow", reason="waf_disabled")
         
-        # Step 2: Whitelist checks
+        # Step 1.5: Whitelist checks FIRST (bypass all security for whitelisted IPs)
         whitelist_check = self._check_whitelists(request)
         if whitelist_check:
-            # ✅ CHANGE: Use structured logging
             self.waf_logger.log_whitelist_bypass(
                 client_ip=request.client_ip,
                 reason=whitelist_check,
@@ -105,7 +126,44 @@ class PyWAF:
             self.stats["allowed_requests"] += 1
             return WAFResponse(allowed=True, action="allow", reason=whitelist_check)
         
-        # Step 3: Build request dictionary for detectors
+        # Step 2: Check if IP is blocked by IPManager
+        if self.ip_manager.is_blocked(request.client_ip):
+            remaining = self.ip_manager.get_block_remaining_time(request.client_ip)
+            self.logger.warning(f"Blocked IP {request.client_ip} attempted access ({remaining:.0f}s remaining)")
+            self.stats["blocked_requests"] += 1
+            return WAFResponse(
+                allowed=False,
+                action="block",
+                reason="ip_blocked",
+                status_code=403,
+                details={
+                    "block_remaining_seconds": remaining,
+                    "reputation": self.ip_manager.get_ip_reputation(request.client_ip)
+                }
+            )
+        
+        # Step 3: Rate limiting check
+        if self.rate_limiting_enabled:
+            rate_limited, rate_reason = self.rate_limiter.rate_limit_check(request.client_ip)
+            if rate_limited:
+                self.logger.warning(f"Rate limit exceeded for IP {request.client_ip}: {rate_reason}")
+                self.stats["blocked_requests"] += 1
+                # Record as violation for potential auto-block
+                self.ip_manager.record_violation(
+                    request.client_ip,
+                    "rate_limit_exceeded",
+                    severity="medium",
+                    details={"reason": rate_reason, "path": request.path}
+                )
+                return WAFResponse(
+                    allowed=False,
+                    action="block",
+                    reason=f"rate_limited:{rate_reason}",
+                    status_code=429,
+                    details={"rate_limit_reason": rate_reason}
+                )
+        
+        # Step 4: Build request dictionary for detectors
         request_dict = self._build_request_dict(request)
         
         # Step 4: Run security detectors
@@ -125,9 +183,13 @@ class PyWAF:
     def _check_whitelists(self, request: WAFRequest) -> Optional[str]:
         """Check if request matches any whitelist rules"""
         
-        # IP whitelist
+        # IP whitelist (config-based)
         if request.client_ip in self.whitelist_ips:
             return f"ip_whitelisted:{request.client_ip}"
+        
+        # IP whitelist (IPManager-based - dynamic whitelist)
+        if self.ip_manager.is_whitelisted(request.client_ip):
+            return f"ip_manager_whitelisted:{request.client_ip}"
         
         # Path whitelist
         for whitelisted_path in self.whitelist_paths:
@@ -253,6 +315,19 @@ class PyWAF:
         primary_detection = detection_results["detections"][0]
         attack_type = primary_detection["type"]
         confidence = primary_detection.get("confidence", "medium")
+        
+        # Record violation in IPManager for tracking and potential auto-block
+        severity_map = {"high": "high", "medium": "medium", "low": "low"}
+        self.ip_manager.record_violation(
+            request.client_ip,
+            violation_type=attack_type,
+            severity=severity_map.get(confidence, "medium"),
+            details={
+                "path": request.path,
+                "method": request.method,
+                "detection_details": primary_detection.get("details", {})
+            }
+        )
         
         # High confidence attacks - always block regardless of mode
         if detection_results["high_confidence_attack"]:
@@ -410,8 +485,13 @@ class PyWAF:
         else:
             stats["block_rate"] = 0.0
         
-        # ✅ ADD: Include logger statistics
+        # Include logger statistics
         stats["logger_stats"] = self.waf_logger.get_stats()
+        
+        # Include security module statistics
+        stats["ip_manager_stats"] = self.ip_manager.get_stats()
+        stats["rate_limiter_stats"] = self.rate_limiter.get_stats()
+        stats["suspicious_ips"] = self.ip_manager.get_suspicious_ips(min_violations=3)
         
         return stats
     
@@ -431,6 +511,8 @@ class PyWAF:
     def health_check(self) -> Dict[str, Any]:
         """Perform health check of WAF components"""
         total_patterns = sum(len(patterns) for patterns in self.rules.values())
+        ip_manager_stats = self.ip_manager.get_stats()
+        rate_limiter_stats = self.rate_limiter.get_stats()
         
         return {
             "status": "healthy",
@@ -441,6 +523,15 @@ class PyWAF:
                 "sql_injection": self.config_loader.is_detection_enabled("sql_injection"),
                 "xss": self.config_loader.is_detection_enabled("xss"),
                 "path_traversal": self.config_loader.is_detection_enabled("path_traversal"),
+            },
+            "security_modules": {
+                "rate_limiting_enabled": self.rate_limiting_enabled,
+                "ip_auto_block_enabled": self.ip_manager.auto_block,
+                "block_threshold": self.ip_manager.block_threshold,
+                "blocked_ips_count": ip_manager_stats["blocked_ips_active"],
+                "whitelisted_ips_count": ip_manager_stats["whitelisted_ips"],
+                "suspicious_ips_count": ip_manager_stats["suspicious_ips"],
+                "rate_limit_active_blocks": rate_limiter_stats["active_blocks"]
             },
             "total_patterns": total_patterns,
             "whitelisted_ips": len(self.whitelist_ips),
@@ -453,7 +544,7 @@ class PyWAF:
                 )
                 if self.stats["total_requests"] > 0 else 0.0
             ),
-            "events_stored": len(self.waf_logger.security_events)  # ✅ ADD
+            "events_stored": len(self.waf_logger.security_events)
         }
 
 

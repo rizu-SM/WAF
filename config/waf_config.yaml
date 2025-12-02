@@ -2,6 +2,7 @@ waf:
   enabled: true
   mode: block
   max_payload_length: 2000
+  backend_url: "http://localhost:5000"
 
 detection:
   sql_injection:
@@ -19,7 +20,7 @@ security:
     block_duration: 300
   bruteforce_protection:
     enabled: true
-    max_attempts: 5
+    max_attempts: 10
     window_minutes: 10
 
 logging:

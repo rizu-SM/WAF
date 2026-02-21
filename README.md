@@ -1,96 +1,129 @@
-# PyWAF - Python Web Application Firewall
+# 🛡️ PyWAF — Python Web Application Firewall
 
-A comprehensive Web Application Firewall (WAF) implemented in Python with Flask integration.
+A modular, Python-based **Web Application Firewall** built with Flask. PyWAF inspects every incoming HTTP request in real time and blocks common web attacks before they reach your application.
 
-## 🛡️ Features
+> ⚠️ The project ships with an **intentionally vulnerable** demo app so you can see the WAF in action. **Never** expose the demo app without WAF protection.
 
-### Security Protection
-- **SQL Injection Detection** - Advanced pattern matching with keyword, logic, and regex detection
-- **XSS Prevention** - Detects script tags, event handlers, URI schemes, and obfuscation techniques
-- **Path Traversal Defense** - Blocks directory traversal, null bytes, and encoding bypasses
-- **Rate Limiting** - Sliding window algorithm with configurable limits
-- **IP Management** - Automatic blocking with violation tracking and whitelisting
+---
 
-### Configuration
-- **Flexible Modes** - Block, Log, or Challenge mode
-- **YAML Configuration** - Easy-to-edit configuration files
-- **JSON Rules** - Regex pattern rules for all attack types
-- **Whitelist Support** - IP and path whitelisting
+## ✨ Features
 
-### Monitoring
-- **Real-time Statistics** - Dashboard with attack metrics
-- **Event Logging** - Structured JSON logging with rotation
-- **Health Checks** - Monitor WAF status and configuration
+### 🔍 Attack Detection
+| Engine | What it catches |
+|---|---|
+| **SQL Injection** | Keyword heuristics, logic manipulation (`' OR 1=1`), comment tokens (`--`, `/*`), and regex rule matching with confidence scoring (low / medium / high). |
+| **XSS (Cross-Site Scripting)** | Dangerous HTML tags, event handlers (`onload`, `onerror`…), JavaScript URI schemes, encoded & obfuscated payloads. |
+| **Path Traversal** | `../` sequences, null-byte injection, absolute-path access, encoding bypasses (`%2e%2e`), and dangerous system file checks (`/etc/passwd`, `win.ini`…). |
 
-## 🚀 Quick Start
+### 🔒 Security Controls
+- **Rate Limiting** — Sliding-window algorithm tracks requests per IP; auto-blocks abusive clients for a configurable duration.
+- **Brute-Force Protection** — Limits login attempts within a time window.
+- **IP Management** — Block / unblock IPs (temporary or permanent), maintain a whitelist, track violations with auto-blocking, and persist state to disk.
 
-### 1. Install Dependencies
+### 📊 Monitoring & Logging
+- **WAF Statistics Dashboard** — Real-time stats page at `/waf/stats` showing total requests, blocked attacks, and recent security events.
+- **REST API** — `GET /api/waf/stats` for programmatic access; `POST /api/waf/reload` to hot-reload configuration.
+- **Structured Logging** — All decisions (allow / block / challenge) are logged with attack type, confidence level, and request details.
+
+### ⚙️ Configuration
+- **YAML config** (`config/waf_config.yaml`) — Enable/disable detectors, set rate limits, choose WAF mode (`block` / `monitor`).
+- **JSON rules** (`config/waf_rules.json`) — Regex patterns for SQL injection, XSS, and path traversal.
+- **Whitelist** (`config/whitelist.json`) — Trusted IPs that bypass all checks.
+- **Hot-reload** — Update rules without restarting the server via the reload API endpoint.
+
+---
+
+## 🏗️ Project Structure
+
+```
+PyWAF/
+├── app.py                  # Flask demo app + WAF middleware
+├── config/
+│   ├── waf_config.yaml     # Main WAF settings
+│   ├── waf_rules.json      # Detection regex patterns
+│   ├── whitelist.json       # Whitelisted IPs
+│   └── blocked_ips.json     # Persisted blocked IPs
+├── src/
+│   ├── core/
+│   │   ├── waf.py           # Main WAF engine (PyWAF class)
+│   │   └── config_loader.py # YAML/JSON config loading
+│   ├── detection/
+│   │   ├── sql_injection.py # SQL injection detector
+│   │   ├── xss.py           # XSS detector
+│   │   ├── path_traversal.py# Path traversal detector
+│   │   └── pattern_matcher.py # Shared regex helper
+│   ├── security/
+│   │   ├── rate_limiter.py  # Sliding-window rate limiter
+│   │   └── ip_manager.py    # IP blocking & whitelisting
+│   ├── middleware/
+│   │   └── request_parser.py# Flask ↔ WAF request adapter
+│   └── utils/
+│       └── logger.py        # Structured WAF logger
+├── templates/               # HTML pages (dashboard, login, search…)
+├── tests/                   # Unit tests for each detector & module
+├── docs/                    # Design docs & detection flow notes
+└── logs/                    # Runtime log files
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Python 3.10+
+
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/your-username/PyWAF.git
+cd PyWAF
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 2. Run the Vulnerable Web Application
+### Run
 
 ```bash
 python app.py
 ```
 
-The application will start on `http://localhost:5000`
+The server starts on **http://localhost:5000**.
 
-### 3. Access the Application
+| Page | URL |
+|---|---|
+| Home | `http://localhost:5000/` |
+| WAF Dashboard | `http://localhost:5000/waf/stats` |
+| Login (SQLi demo) | `http://localhost:5000/login` |
+| Search (XSS demo) | `http://localhost:5000/search` |
+| File Viewer (Path Traversal demo) | `http://localhost:5000/files` |
 
-- **Home Page**: http://localhost:5000/
-- **WAF Dashboard**: http://localhost:5000/waf/stats
-- **Login Page**: http://localhost:5000/login
+**Demo credentials:** `admin / admin123` or `john / password`
 
-### 4. Test Credentials
+---
 
-```
-Username: admin | Password: admin123
-Username: john  | Password: password
-```
+## 🧪 Testing
 
-## 🧪 Testing the WAF
+```bash
+# Run all tests
+python -m pytest tests/
 
-### SQL Injection Tests
-
-Try logging in with these payloads (all will be blocked):
-
-```
-Username: admin' OR '1'='1'--
-Username: ' OR 1=1--
-Username: admin'--
-```
-
-### XSS Tests
-
-Try searching with these payloads (all will be blocked):
-
-```
-<script>alert('XSS')</script>
-<img src=x onerror=alert(1)>
-<svg onload=alert('XSS')>
-javascript:alert('XSS')
+# Run a specific detector test
+python -m pytest tests/test_sql_inj.py
+python -m pytest tests/test_xss.py
+python -m pytest tests/test_path_traversal.py
+python -m pytest tests/test_dos_protection.py
 ```
 
-### Path Traversal Tests
+---
 
-Try accessing files with these paths (all will be blocked):
+## 🧰 Tech Stack
 
-```
-../../etc/passwd
-..\\..\\windows\\system32\\config\\sam
-%2e%2e%2f%2e%2e%2fetc%2fpasswd
-/etc/shadow
-```
+- **Python 3** + **Flask** — Web framework & middleware
+- **SQLite** — Demo database
+- **PyYAML** — Configuration parsing
+- **Regex** — Pattern-based detection engine
+- **Threading** — Thread-safe rate limiting & IP management
 
-## ⚠️ Security Notice
-
-**IMPORTANT**: The included web application (`app.py`) contains **intentional security vulnerabilities** for testing purposes. 
-
-- **DO NOT** use this application in production
-- **DO NOT** expose it to the internet
-- This is for **educational and testing purposes only**
-
-The PyWAF protects against these attacks, demonstrating how a WAF works in real-time.
+---
